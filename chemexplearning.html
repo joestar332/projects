@@ -1,0 +1,1742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PROPULSE — Rocket Propulsion Chemistry Simulator</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;500;600;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #020c14;
+    --bg2: #04111d;
+    --bg3: #071828;
+    --panel: #061422;
+    --border: rgba(0,200,255,0.15);
+    --border2: rgba(0,200,255,0.3);
+    --cyan: #00c8ff;
+    --cyan2: #00a8d8;
+    --orange: #ff6a00;
+    --orange2: #ff9500;
+    --green: #00ff88;
+    --red: #ff3a3a;
+    --yellow: #ffd700;
+    --text: #c8e8f8;
+    --text2: #6a9ab8;
+    --text3: #3a6a88;
+    --mono: 'Share Tech Mono', monospace;
+    --display: 'Orbitron', sans-serif;
+    --ui: 'Rajdhani', sans-serif;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--ui);
+    font-size: 14px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .scanlines {
+    position: fixed; inset: 0; pointer-events: none; z-index: 100;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+  }
+
+  .grid-bg {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background-image:
+      linear-gradient(rgba(0,200,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,200,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  /* Twinkling stars background */
+  .stars-canvas {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  }
+
+  .app { position: relative; z-index: 1; max-width: 1600px; margin: 0 auto; padding: 16px; }
+
+  /* HEADER */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 20px; margin-bottom: 16px;
+    border: 1px solid var(--border2);
+    background: var(--panel);
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%);
+  }
+
+  .logo {
+    font-family: var(--display);
+    font-size: 22px; font-weight: 900;
+    color: var(--cyan);
+    letter-spacing: 4px;
+  }
+  .logo span { color: var(--orange); }
+
+  .header-meta {
+    display: flex; gap: 24px; align-items: center;
+    font-family: var(--mono); font-size: 11px; color: var(--text2);
+  }
+
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green);
+    animation: pulse 2s infinite;
+    display: inline-block; margin-right: 6px;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* LAYOUT */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 340px 1fr 280px;
+    grid-template-rows: auto auto auto;
+    gap: 12px;
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+  .panel::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    opacity: 0.5;
+  }
+  .panel-title {
+    font-family: var(--display);
+    font-size: 10px; letter-spacing: 3px;
+    color: var(--cyan); text-transform: uppercase;
+    margin-bottom: 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .panel-title::after {
+    content: ''; flex: 1; height: 1px;
+    background: linear-gradient(90deg, var(--border2), transparent);
+  }
+
+  /* CONTROLS */
+  .controls-panel { grid-column: 1; grid-row: 1 / 3; }
+
+  .fuel-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 6px; margin-bottom: 16px;
+  }
+
+  .fuel-btn {
+    background: var(--bg3); border: 1px solid var(--border);
+    color: var(--text2); padding: 10px 8px;
+    cursor: pointer; font-family: var(--mono); font-size: 11px;
+    text-align: center; transition: all 0.2s;
+    position: relative; overflow: hidden;
+    clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+  }
+  .fuel-btn:hover { border-color: var(--cyan); color: var(--cyan); background: rgba(0,200,255,0.05); }
+  .fuel-btn.active {
+    border-color: var(--orange);
+    background: rgba(255,106,0,0.1);
+    color: var(--orange2);
+  }
+  .fuel-btn .fuel-name { font-weight: bold; font-size: 12px; }
+  .fuel-btn .fuel-isp { font-size: 9px; color: var(--text3); margin-top: 2px; }
+  .fuel-btn.active .fuel-isp { color: var(--orange); }
+
+  .slider-group { margin-bottom: 18px; }
+  .slider-label {
+    display: flex; justify-content: space-between;
+    font-size: 11px; color: var(--text2); margin-bottom: 6px;
+    font-family: var(--mono);
+  }
+  .slider-label span:last-child { color: var(--cyan); }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100%; height: 4px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    outline: none; cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    background: var(--cyan);
+    border: 2px solid var(--bg);
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+    cursor: pointer;
+  }
+  input[type=range].orange-slider::-webkit-slider-thumb { background: var(--orange); }
+
+  /* TOGGLE CONTROLS */
+  .toggle-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 6px; margin-bottom: 14px;
+  }
+  .toggle-btn {
+    background: var(--bg3); border: 1px solid var(--border2);
+    color: var(--cyan); padding: 8px 10px;
+    cursor: pointer; font-family: var(--mono); font-size: 10px;
+    text-align: center; transition: all 0.2s;
+    letter-spacing: 1px;
+  }
+  .toggle-btn:hover { background: rgba(0,200,255,0.08); }
+  .toggle-btn.off {
+    color: var(--text3); border-color: var(--border);
+    background: var(--bg);
+  }
+  .toggle-btn.audio-btn {
+    grid-column: span 2;
+    color: var(--text3); border-color: var(--border);
+  }
+  .toggle-btn.audio-btn.on {
+    color: var(--green); border-color: rgba(0,255,136,0.4);
+    background: rgba(0,255,136,0.05);
+  }
+
+  .ignite-btn {
+    width: 100%; padding: 14px;
+    background: transparent;
+    border: 2px solid var(--orange);
+    color: var(--orange2);
+    font-family: var(--display);
+    font-size: 14px; letter-spacing: 4px;
+    cursor: pointer; transition: all 0.2s;
+    clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+    margin-top: 8px;
+  }
+  .ignite-btn:hover {
+    background: rgba(255,106,0,0.15);
+    box-shadow: 0 0 20px rgba(255,106,0,0.3);
+  }
+  .ignite-btn.firing {
+    background: rgba(255,106,0,0.2);
+    animation: fire-pulse 0.3s infinite;
+  }
+  @keyframes fire-pulse { 0%,100%{box-shadow:0 0 20px rgba(255,106,0,0.4)} 50%{box-shadow:0 0 40px rgba(255,106,0,0.8)} }
+
+  .abort-btn {
+    width: 100%; padding: 8px;
+    background: rgba(255,58,58,0.05);
+    border: 1px solid rgba(255,58,58,0.4);
+    color: var(--red);
+    font-family: var(--mono);
+    font-size: 11px; letter-spacing: 2px;
+    cursor: pointer; margin-top: 6px;
+    transition: all 0.2s;
+  }
+  .abort-btn:hover { background: rgba(255,58,58,0.15); }
+
+  /* ENGINE VISUAL */
+  .engine-panel { grid-column: 2; grid-row: 1; }
+  .engine-visual {
+    display: flex; align-items: center; justify-content: center;
+    height: 560px; position: relative;
+    background: var(--bg);
+    border: 1px solid var(--border); margin-bottom: 0;
+    overflow: hidden;
+  }
+
+  /* View mode tabs */
+  .view-tabs {
+    display: flex; gap: 0; margin-bottom: 10px;
+    border: 1px solid var(--border2);
+  }
+  .view-tab {
+    flex: 1; padding: 7px 10px;
+    background: transparent; border: none;
+    color: var(--text3); font-family: var(--mono); font-size: 9px;
+    letter-spacing: 1.5px; cursor: pointer; transition: all 0.2s;
+    border-right: 1px solid var(--border);
+    text-transform: uppercase;
+  }
+  .view-tab:last-child { border-right: none; }
+  .view-tab:hover { color: var(--cyan); background: rgba(0,200,255,0.04); }
+  .view-tab.active { color: var(--cyan); background: rgba(0,200,255,0.08); }
+
+  .nozzle-svg { width: 340px; height: 540px; }
+
+  .particle-canvas {
+    position: absolute; bottom: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none;
+  }
+
+  /* TELEMETRY */
+  .telemetry-panel { grid-column: 3; grid-row: 1 / 3; }
+
+  .telem-cards { display: flex; flex-direction: column; gap: 8px; }
+
+  .telem-card {
+    background: var(--bg3); border: 1px solid var(--border);
+    padding: 10px 12px;
+    position: relative;
+  }
+  .telem-card::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+    background: var(--cyan);
+  }
+  .telem-card.warn::before { background: var(--yellow); }
+  .telem-card.danger::before { background: var(--red); }
+  .telem-card.ok::before { background: var(--green); }
+
+  .telem-label { font-size: 9px; letter-spacing: 2px; color: var(--text3); text-transform: uppercase; font-family: var(--mono); }
+  .telem-value { font-family: var(--mono); font-size: 22px; color: var(--cyan); line-height: 1.2; }
+  .telem-unit { font-size: 10px; color: var(--text2); }
+  .telem-bar {
+    height: 2px; background: var(--bg); margin-top: 6px;
+    position: relative; overflow: hidden;
+  }
+  .telem-bar-fill { height: 100%; background: var(--cyan); transition: width 0.5s; }
+  .telem-card.warn .telem-bar-fill { background: var(--yellow); }
+  .telem-card.danger .telem-bar-fill { background: var(--red); }
+  .telem-card.ok .telem-bar-fill { background: var(--green); }
+
+  /* GRAPHS */
+  .graphs-panel { grid-column: 1 / 3; grid-row: 3; }
+  .graphs-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .chart-wrap {
+    background: var(--bg); padding: 12px;
+    border: 1px solid var(--border);
+  }
+  .chart-label { font-size: 10px; color: var(--text2); font-family: var(--mono); margin-bottom: 8px; }
+
+  /* THEORY — upgraded */
+  .theory-panel { grid-column: 3; grid-row: 3; }
+  .theory-content { font-size: 12px; line-height: 1.7; color: var(--text2); }
+
+  .theory-propellant-tags {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px;
+  }
+  .theory-tag {
+    padding: 4px 10px; font-size: 10px;
+    font-family: var(--mono);
+    background: var(--bg3); border: 1px solid var(--border2);
+    color: var(--cyan);
+  }
+  .theory-tag.ox-tag { color: var(--orange2); border-color: rgba(255,150,0,0.4); }
+  .theory-tag.mol-tag { color: var(--text2); border-color: var(--border); font-size: 9px; }
+
+  .theory-section { margin-bottom: 10px; }
+  .theory-section-title {
+    font-family: var(--ui); font-weight: 700; font-size: 12px;
+    color: var(--text); margin-bottom: 3px;
+  }
+  .theory-section-body {
+    font-family: var(--ui); font-size: 11px; line-height: 1.6; color: var(--text2);
+  }
+
+  .eq-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-left: 2px solid var(--cyan);
+    padding: 8px 12px;
+    font-family: var(--mono);
+    font-size: 11px; color: var(--cyan);
+    margin: 8px 0;
+  }
+  .eq-label { font-size: 9px; color: var(--text3); margin-bottom: 2px; }
+
+  .theory-meta {
+    margin-top: 10px;
+    padding: 8px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-left: 2px solid var(--green);
+    font-size: 11px; font-family: var(--ui); line-height: 1.6;
+  }
+  .theory-meta-label { font-size: 9px; letter-spacing: 1px; color: var(--text3); font-family: var(--mono); }
+  .theory-meta-val { color: var(--text2); }
+  .theory-risk {
+    border-left-color: var(--yellow);
+    margin-top: 6px;
+  }
+  .reaction-eq {
+    font-family: var(--mono); font-size: 11px;
+    color: var(--orange2); padding: 8px 10px;
+    background: var(--bg); border: 1px solid rgba(255,106,0,0.2);
+    border-left: 2px solid var(--orange);
+    margin: 8px 0;
+  }
+
+  /* FUEL COMPARISON MATRIX — upgraded with charts */
+  .matrix-panel { grid-column: 1 / 4; grid-row: 4; }
+  .matrix-inner {
+    display: grid; grid-template-columns: 1fr 320px;
+    gap: 16px;
+  }
+  .matrix-chart-wrap {
+    background: var(--bg); border: 1px solid var(--border);
+    padding: 12px; position: relative;
+    height: 240px;
+  }
+  .matrix-radar-wrap {
+    background: var(--bg); border: 1px solid var(--border);
+    padding: 12px; position: relative;
+    height: 240px;
+  }
+  .matrix-chart-label { font-size: 9px; color: var(--text2); font-family: var(--mono); margin-bottom: 8px; letter-spacing: 1.5px; }
+
+  /* Old table removed, replaced by charts */
+
+  .badge {
+    display: inline-block; padding: 1px 6px;
+    font-size: 9px; letter-spacing: 1px;
+    border: 1px solid; border-radius: 2px;
+  }
+  .badge-green { color: var(--green); border-color: var(--green); }
+  .badge-yellow { color: var(--yellow); border-color: var(--yellow); }
+  .badge-red { color: var(--red); border-color: var(--red); }
+  .badge-cyan { color: var(--cyan); border-color: var(--cyan); }
+
+  .mission-clock {
+    font-family: var(--mono); font-size: 13px; color: var(--green);
+    letter-spacing: 2px;
+  }
+  .sep { color: var(--text3); margin: 0 8px; }
+
+  /* Twinkling star keyframes */
+  @keyframes twinkle {
+    0%,100%{opacity:1;transform:scale(1)}
+    50%{opacity:0.2;transform:scale(0.5)}
+  }
+</style>
+</head>
+<body>
+<canvas class="stars-canvas" id="starsCanvas"></canvas>
+<div class="scanlines"></div>
+<div class="grid-bg"></div>
+
+<div class="app">
+  <header>
+    <div class="logo">PROPULSE<span>.</span>SIM</div>
+    <div class="header-meta">
+      <span><span class="status-dot"></span>SYSTEM NOMINAL</span>
+      <span class="sep">|</span>
+      <span>MCS v4.7.2</span>
+      <span class="sep">|</span>
+      <span class="mission-clock" id="clock">T+00:00:00</span>
+    </div>
+  </header>
+
+  <div class="main-grid">
+
+    <!-- CONTROLS -->
+    <div class="panel controls-panel">
+      <div class="panel-title">Propellant Config</div>
+
+      <div style="font-size:9px;color:var(--text3);letter-spacing:2px;margin-bottom:8px;font-family:var(--mono);">SELECT FUEL</div>
+      <div class="fuel-grid" id="fuelGrid"></div>
+
+      <div style="font-size:9px;color:var(--text3);letter-spacing:2px;margin-bottom:8px;font-family:var(--mono);">SELECT OXIDIZER</div>
+      <div class="fuel-grid" id="oxGrid"></div>
+
+      <div class="slider-group">
+        <div class="slider-label">
+          <span>O/F RATIO</span>
+          <span id="ofVal">2.5</span>
+        </div>
+        <input type="range" id="ofSlider" min="0.5" max="8" step="0.1" value="2.5" class="orange-slider">
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-label">
+          <span>CHAMBER PRESSURE</span>
+          <span id="pcVal">3.0 MPa</span>
+        </div>
+        <input type="range" id="pcSlider" min="0.5" max="20" step="0.1" value="3">
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-label">
+          <span>NOZZLE EXPANSION RATIO</span>
+          <span id="nzVal">25:1</span>
+        </div>
+        <input type="range" id="nzSlider" min="5" max="200" step="1" value="25">
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-label">
+          <span>THROAT DIAMETER</span>
+          <span id="dtVal">150 mm</span>
+        </div>
+        <input type="range" id="dtSlider" min="10" max="500" step="5" value="150">
+      </div>
+
+      <!-- VISUAL TOGGLES -->
+      <div style="font-size:9px;color:var(--text3);letter-spacing:2px;margin-bottom:8px;font-family:var(--mono);">VISUALIZATION TOGGLES</div>
+      <div class="toggle-grid">
+        <button class="toggle-btn" id="toggleLabels" onclick="toggleViz('labels')">Labels: ON</button>
+        <button class="toggle-btn" id="toggleShock" onclick="toggleViz('shock')">Shock: ON</button>
+        <button class="toggle-btn" id="toggleCooling" onclick="toggleViz('cooling')">Cooling: ON</button>
+        <button class="toggle-btn" id="toggleInjectors" onclick="toggleViz('injectors')">Injectors: ON</button>
+        <button class="toggle-btn audio-btn" id="toggleAudio" onclick="toggleViz('audio')">Audio: OFF</button>
+      </div>
+
+      <button class="ignite-btn" id="igniteBtn" onclick="toggleIgnition()">◈ IGNITE ENGINE</button>
+      <button class="abort-btn" onclick="abort()">■ ABORT SEQUENCE</button>
+    </div>
+
+    <!-- ENGINE VISUAL -->
+    <div class="panel engine-panel">
+      <div class="panel-title">Engine Chamber Visualization</div>
+      <!-- View mode tabs -->
+      <div class="view-tabs">
+        <button class="view-tab active" id="tab-cutaway" onclick="setViewMode('cutaway')">ENGINE CUTAWAY</button>
+        <button class="view-tab" id="tab-thermal" onclick="setViewMode('thermal')">LIVE THERMAL STATE</button>
+        <button class="view-tab" id="tab-hotfire" onclick="setViewMode('hotfire')">HOT FIRE</button>
+      </div>
+      <div class="engine-visual" id="engineViz">
+        <canvas class="particle-canvas" id="particleCanvas"></canvas>
+        <svg class="nozzle-svg" viewBox="0 0 340 540" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="chamberGrad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#030f1c"/>
+              <stop offset="30%" stop-color="#0d2a42"/>
+              <stop offset="50%" stop-color="#112e48"/>
+              <stop offset="70%" stop-color="#0d2a42"/>
+              <stop offset="100%" stop-color="#030f1c"/>
+            </linearGradient>
+            <linearGradient id="wallGrad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#0a1e30"/>
+              <stop offset="50%" stop-color="#1a3a58"/>
+              <stop offset="100%" stop-color="#0a1e30"/>
+            </linearGradient>
+            <linearGradient id="nozzleGrad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#020c14"/>
+              <stop offset="50%" stop-color="#081824"/>
+              <stop offset="100%" stop-color="#020c14"/>
+            </linearGradient>
+            <linearGradient id="hotGrad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#1a0800"/>
+              <stop offset="50%" stop-color="#3a1200"/>
+              <stop offset="100%" stop-color="#1a0800"/>
+            </linearGradient>
+            <!-- Thermal gradient for thermal view -->
+            <linearGradient id="thermalGrad" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stop-color="#000080"/>
+              <stop offset="30%" stop-color="#0044ff"/>
+              <stop offset="55%" stop-color="#00cc44"/>
+              <stop offset="75%" stop-color="#ffaa00"/>
+              <stop offset="90%" stop-color="#ff3300"/>
+              <stop offset="100%" stop-color="#ffffff"/>
+            </linearGradient>
+            <linearGradient id="flameGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
+              <stop offset="15%" stop-color="#ffe0a0" stop-opacity="0.95"/>
+              <stop offset="35%" stop-color="#ff9500" stop-opacity="0.85"/>
+              <stop offset="60%" stop-color="#ff4400" stop-opacity="0.6"/>
+              <stop offset="85%" stop-color="#ff1100" stop-opacity="0.2"/>
+              <stop offset="100%" stop-color="#ff0000" stop-opacity="0"/>
+            </linearGradient>
+            <linearGradient id="flame2Grad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#ffffff" stop-opacity="0.8"/>
+              <stop offset="40%" stop-color="#ff6600" stop-opacity="0.5"/>
+              <stop offset="100%" stop-color="#ff2200" stop-opacity="0"/>
+            </linearGradient>
+            <linearGradient id="injectGrad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#061828"/>
+              <stop offset="50%" stop-color="#0e2c46"/>
+              <stop offset="100%" stop-color="#061828"/>
+            </linearGradient>
+            <radialGradient id="hotspotGrad" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#ff9500" stop-opacity="0.4"/>
+              <stop offset="100%" stop-color="#ff3300" stop-opacity="0"/>
+            </radialGradient>
+            <!-- Regen cooling gradient -->
+            <linearGradient id="regenGrad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="rgba(0,200,255,0.15)"/>
+              <stop offset="50%" stop-color="rgba(0,200,255,0.05)"/>
+              <stop offset="100%" stop-color="rgba(0,200,255,0.15)"/>
+            </linearGradient>
+            <filter id="glow">
+              <feGaussianBlur stdDeviation="2" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+            <filter id="glowStrong">
+              <feGaussianBlur stdDeviation="4" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+
+          <!-- ── PROPELLANT FEED LINES (top) ── -->
+          <rect x="80" y="2" width="12" height="22" fill="#0a1e30" stroke="rgba(0,200,255,0.5)" stroke-width="0.8"/>
+          <text x="86" y="14" text-anchor="middle" fill="rgba(0,200,255,0.7)" font-size="5.5" font-family="Share Tech Mono">FUEL</text>
+          <rect x="248" y="2" width="12" height="22" fill="#1a0800" stroke="rgba(255,150,0,0.5)" stroke-width="0.8"/>
+          <text x="254" y="14" text-anchor="middle" fill="rgba(255,150,0,0.7)" font-size="5.5" font-family="Share Tech Mono">OX</text>
+          <line x1="86" y1="24" x2="86" y2="34" stroke="rgba(0,200,255,0.4)" stroke-width="1.5"/>
+          <line x1="254" y1="24" x2="254" y2="34" stroke="rgba(255,150,0,0.4)" stroke-width="1.5"/>
+          <line x1="86" y1="34" x2="140" y2="34" stroke="rgba(0,200,255,0.3)" stroke-width="1"/>
+          <line x1="254" y1="34" x2="200" y2="34" stroke="rgba(255,150,0,0.3)" stroke-width="1"/>
+
+          <!-- ── INJECTOR PLATE ── -->
+          <rect x="75" y="36" width="190" height="18" rx="1" fill="url(#injectGrad)" stroke="rgba(0,200,255,0.6)" stroke-width="1"/>
+          <text x="170" y="48" text-anchor="middle" fill="rgba(0,200,255,0.8)" font-size="6" font-family="Share Tech Mono" letter-spacing="1">INJECTOR PLATE</text>
+          <!-- Injector orifices -->
+          <circle cx="100" cy="44" r="2.5" fill="rgba(0,200,255,0.3)" stroke="rgba(0,200,255,0.7)" stroke-width="0.5"/>
+          <circle cx="120" cy="44" r="2.5" fill="rgba(255,150,0,0.3)" stroke="rgba(255,150,0,0.7)" stroke-width="0.5"/>
+          <circle cx="140" cy="44" r="2.5" fill="rgba(0,200,255,0.3)" stroke="rgba(0,200,255,0.7)" stroke-width="0.5"/>
+          <circle cx="160" cy="44" r="2.5" fill="rgba(255,150,0,0.3)" stroke="rgba(255,150,0,0.7)" stroke-width="0.5"/>
+          <circle cx="180" cy="44" r="2.5" fill="rgba(0,200,255,0.3)" stroke="rgba(0,200,255,0.7)" stroke-width="0.5"/>
+          <circle cx="200" cy="44" r="2.5" fill="rgba(255,150,0,0.3)" stroke="rgba(255,150,0,0.7)" stroke-width="0.5"/>
+          <circle cx="220" cy="44" r="2.5" fill="rgba(0,200,255,0.3)" stroke="rgba(0,200,255,0.7)" stroke-width="0.5"/>
+          <circle cx="240" cy="44" r="2.5" fill="rgba(255,150,0,0.3)" stroke="rgba(255,150,0,0.7)" stroke-width="0.5"/>
+
+          <!-- ── CHAMBER OUTER WALL (regen cooling jacket) ── -->
+          <rect x="68" y="54" width="204" height="160" rx="2" fill="url(#wallGrad)" stroke="rgba(0,200,255,0.5)" stroke-width="1.2"/>
+
+          <!-- Regen cooling channels - highlighted strips -->
+          <g id="regenCooling">
+            <rect x="68" y="54" width="8" height="160" fill="url(#regenGrad)" opacity="0.8"/>
+            <rect x="264" y="54" width="8" height="160" fill="url(#regenGrad)" opacity="0.8"/>
+            <!-- Regen flow arrows left -->
+            <text x="72" y="90" text-anchor="middle" fill="rgba(0,200,255,0.6)" font-size="7" font-family="Share Tech Mono">↑</text>
+            <text x="72" y="110" text-anchor="middle" fill="rgba(0,200,255,0.6)" font-size="7" font-family="Share Tech Mono">↑</text>
+            <text x="72" y="130" text-anchor="middle" fill="rgba(0,200,255,0.6)" font-size="7" font-family="Share Tech Mono">↑</text>
+            <text x="72" y="150" text-anchor="middle" fill="rgba(0,200,255,0.6)" font-size="7" font-family="Share Tech Mono">↑</text>
+            <text x="72" y="170" text-anchor="middle" fill="rgba(0,200,255,0.6)" font-size="7" font-family="Share Tech Mono">↑</text>
+            <!-- Regen flow arrows right -->
+            <text x="268" y="90" text-anchor="middle" fill="rgba(0,200,255,0.6)" font-size="7" font-family="Share Tech Mono">↓</text>
+            <text x="268" y="110" text-anchor="middle" fill="rgba(0,200,255,0.6)" font-size="7" font-family="Share Tech Mono">↓</text>
+            <text x="268" y="130" text-anchor="middle" fill="rgba(0,200,255,0.6)" font-size="7" font-family="Share Tech Mono">↓</text>
+            <text x="268" y="150" text-anchor="middle" fill="rgba(0,200,255,0.6)" font-size="7" font-family="Share Tech Mono">↓</text>
+            <text x="268" y="170" text-anchor="middle" fill="rgba(0,200,255,0.6)" font-size="7" font-family="Share Tech Mono">↓</text>
+            <!-- REGEN COOLING label callouts -->
+            <line x1="44" y1="134" x2="68" y2="134" stroke="rgba(0,200,255,0.3)" stroke-width="0.6" stroke-dasharray="2,2"/>
+            <text x="42" y="130" text-anchor="end" fill="rgba(0,200,255,0.5)" font-size="5" font-family="Share Tech Mono">REGEN</text>
+            <text x="42" y="138" text-anchor="end" fill="rgba(0,200,255,0.5)" font-size="5" font-family="Share Tech Mono">COOLING</text>
+          </g>
+
+          <!-- Cooling micro ribs -->
+          <line x1="68" y1="75" x2="272" y2="75" stroke="rgba(0,200,255,0.08)" stroke-width="0.5"/>
+          <line x1="68" y1="96" x2="272" y2="96" stroke="rgba(0,200,255,0.08)" stroke-width="0.5"/>
+          <line x1="68" y1="117" x2="272" y2="117" stroke="rgba(0,200,255,0.08)" stroke-width="0.5"/>
+          <line x1="68" y1="138" x2="272" y2="138" stroke="rgba(0,200,255,0.08)" stroke-width="0.5"/>
+          <line x1="68" y1="159" x2="272" y2="159" stroke="rgba(0,200,255,0.08)" stroke-width="0.5"/>
+          <line x1="68" y1="180" x2="272" y2="180" stroke="rgba(0,200,255,0.08)" stroke-width="0.5"/>
+          <line x1="68" y1="201" x2="272" y2="201" stroke="rgba(0,200,255,0.08)" stroke-width="0.5"/>
+
+          <!-- ── COMBUSTION CHAMBER INNER WALL ── -->
+          <rect x="82" y="60" width="176" height="148" rx="1" fill="url(#chamberGrad)" stroke="rgba(0,200,255,0.2)" stroke-width="0.5"/>
+
+          <!-- Thermal overlay (thermal view mode) -->
+          <rect id="thermalOverlay" x="82" y="60" width="176" height="148" fill="url(#thermalGrad)" opacity="0" rx="1"/>
+
+          <!-- Hot combustion interior -->
+          <rect id="hotInterior" x="83" y="61" width="174" height="146" fill="url(#hotGrad)" opacity="0"/>
+          <ellipse id="hotspot" cx="170" cy="134" rx="70" ry="55" fill="url(#hotspotGrad)" opacity="0"/>
+
+          <!-- Injection sprays -->
+          <g id="injSprays" opacity="0">
+            <line x1="100" y1="60" x2="100" y2="90" stroke="rgba(0,200,255,0.6)" stroke-width="1" stroke-dasharray="3,2"/>
+            <line x1="120" y1="60" x2="125" y2="95" stroke="rgba(255,150,0,0.6)" stroke-width="1" stroke-dasharray="3,2"/>
+            <line x1="140" y1="60" x2="140" y2="90" stroke="rgba(0,200,255,0.6)" stroke-width="1" stroke-dasharray="3,2"/>
+            <line x1="160" y1="60" x2="158" y2="95" stroke="rgba(255,150,0,0.6)" stroke-width="1" stroke-dasharray="3,2"/>
+            <line x1="180" y1="60" x2="180" y2="90" stroke="rgba(0,200,255,0.6)" stroke-width="1" stroke-dasharray="3,2"/>
+            <line x1="200" y1="60" x2="202" y2="95" stroke="rgba(255,150,0,0.6)" stroke-width="1" stroke-dasharray="3,2"/>
+            <line x1="220" y1="60" x2="220" y2="90" stroke="rgba(0,200,255,0.6)" stroke-width="1" stroke-dasharray="3,2"/>
+            <line x1="240" y1="60" x2="238" y2="95" stroke="rgba(255,150,0,0.6)" stroke-width="1" stroke-dasharray="3,2"/>
+          </g>
+
+          <!-- Chamber labels -->
+          <g id="labelGroup">
+            <text x="170" y="120" text-anchor="middle" fill="rgba(0,200,255,0.35)" font-size="9" font-family="Share Tech Mono" letter-spacing="2">COMBUSTION</text>
+            <text x="170" y="132" text-anchor="middle" fill="rgba(0,200,255,0.35)" font-size="9" font-family="Share Tech Mono" letter-spacing="2">CHAMBER</text>
+            <text id="pcLabel" x="170" y="148" text-anchor="middle" fill="rgba(255,150,0,0.5)" font-size="8" font-family="Share Tech Mono">—</text>
+            <!-- Tc sensor label -->
+            <text x="292" y="111" fill="rgba(255,150,0,0.5)" font-size="5" font-family="Share Tech Mono">Tc SENSOR</text>
+          </g>
+
+          <!-- Pressure sensor left -->
+          <rect x="60" y="110" width="8" height="14" fill="#0a1e30" stroke="rgba(0,200,255,0.4)" stroke-width="0.5"/>
+          <line x1="68" y1="117" x2="82" y2="117" stroke="rgba(0,200,255,0.3)" stroke-width="0.5"/>
+          <text id="pcSensorLabel" x="54" y="114" text-anchor="end" fill="rgba(0,200,255,0.4)" font-size="5" font-family="Share Tech Mono">Pc</text>
+
+          <!-- Temp sensor right -->
+          <rect x="272" y="100" width="8" height="14" fill="#1a0800" stroke="rgba(255,150,0,0.4)" stroke-width="0.5"/>
+          <line x1="272" y1="107" x2="258" y2="107" stroke="rgba(255,150,0,0.3)" stroke-width="0.5"/>
+
+          <!-- ── CONVERGENT SECTION ── -->
+          <path d="M68 214 C68 214 68 228 96 244 L96 258 L68 258 Z" fill="url(#wallGrad)" stroke="rgba(0,200,255,0.4)" stroke-width="0.8"/>
+          <path d="M272 214 C272 214 272 228 244 244 L244 258 L272 258 Z" fill="url(#wallGrad)" stroke="rgba(0,200,255,0.4)" stroke-width="0.8"/>
+          <path d="M82 214 L110 258" stroke="rgba(0,200,255,0.2)" stroke-width="0.5" fill="none"/>
+          <path d="M258 214 L230 258" stroke="rgba(0,200,255,0.2)" stroke-width="0.5" fill="none"/>
+
+          <text id="convLabel" x="170" y="238" text-anchor="middle" fill="rgba(0,200,255,0.3)" font-size="7" font-family="Share Tech Mono">CONVERGENT</text>
+
+          <!-- ── THROAT ── -->
+          <rect x="96" y="258" width="148" height="18" fill="#020c14" stroke="rgba(0,200,255,0.7)" stroke-width="1"/>
+          <rect x="108" y="262" width="124" height="10" fill="#030f1c" stroke="rgba(0,200,255,0.3)" stroke-width="0.3"/>
+          <text id="throatLabel" x="170" y="270" text-anchor="middle" fill="rgba(0,200,255,0.8)" font-size="6.5" font-family="Share Tech Mono" letter-spacing="2">THROAT — At</text>
+
+          <line x1="96" y1="282" x2="244" y2="282" stroke="rgba(0,200,255,0.3)" stroke-width="0.5"/>
+          <text x="170" y="290" text-anchor="middle" fill="rgba(0,200,255,0.3)" font-size="5.5" font-family="Share Tech Mono" id="throatDimLabel">Dt = 150 mm</text>
+
+          <!-- ── DIVERGENT NOZZLE ── -->
+          <path d="M96 276 L30 472 L310 472 L244 276 Z" fill="url(#nozzleGrad)" stroke="rgba(0,200,255,0.3)" stroke-width="1"/>
+          <line x1="110" y1="276" x2="50" y2="472" stroke="rgba(0,200,255,0.06)" stroke-width="0.5"/>
+          <line x1="130" y1="276" x2="80" y2="472" stroke="rgba(0,200,255,0.06)" stroke-width="0.5"/>
+          <line x1="150" y1="276" x2="115" y2="472" stroke="rgba(0,200,255,0.06)" stroke-width="0.5"/>
+          <line x1="190" y1="276" x2="225" y2="472" stroke="rgba(0,200,255,0.06)" stroke-width="0.5"/>
+          <line x1="210" y1="276" x2="260" y2="472" stroke="rgba(0,200,255,0.06)" stroke-width="0.5"/>
+          <line x1="230" y1="276" x2="290" y2="472" stroke="rgba(0,200,255,0.06)" stroke-width="0.5"/>
+
+          <text id="divLabel" x="170" y="390" text-anchor="middle" fill="rgba(0,200,255,0.25)" font-size="8" font-family="Share Tech Mono">DIVERGENT</text>
+          <text id="nzLabel" x="170" y="402" text-anchor="middle" fill="rgba(0,200,255,0.25)" font-size="7" font-family="Share Tech Mono">ε = 25:1</text>
+
+          <!-- ── EXIT PLANE ── -->
+          <line x1="30" y1="472" x2="310" y2="472" stroke="rgba(0,200,255,0.5)" stroke-width="1.5"/>
+          <text id="exitLabel" x="170" y="484" text-anchor="middle" fill="rgba(0,200,255,0.5)" font-size="6.5" font-family="Share Tech Mono" letter-spacing="2">EXIT PLANE — Ae</text>
+
+          <!-- ── FLAME PLUME (firing state) ── -->
+          <ellipse id="flameCore" cx="170" cy="267" rx="18" ry="8" fill="white" opacity="0"/>
+          <path id="flameBody" d="M110 472 Q130 502 170 542 Q210 502 230 472 Z" fill="url(#flameGrad)" opacity="0"/>
+          <path id="flameSec" d="M80 472 Q120 522 170 562 Q220 522 260 472 Z" fill="url(#flame2Grad)" opacity="0"/>
+          <ellipse id="throatGlow" cx="170" cy="267" rx="60" ry="10" fill="rgba(255,150,0,0.3)" opacity="0"/>
+
+          <!-- Shock diamonds — twinkling, more detailed -->
+          <g id="shockGroup">
+            <ellipse id="shock1" cx="170" cy="338" rx="22" ry="8" fill="none" stroke="rgba(255,180,60,0.0)" stroke-width="1.2"/>
+            <ellipse id="shock1b" cx="170" cy="338" rx="28" ry="11" fill="none" stroke="rgba(255,150,0,0.0)" stroke-width="0.6"/>
+            <ellipse id="shock2" cx="170" cy="388" rx="38" ry="11" fill="none" stroke="rgba(255,180,60,0.0)" stroke-width="1"/>
+            <ellipse id="shock2b" cx="170" cy="388" rx="46" ry="14" fill="none" stroke="rgba(255,150,0,0.0)" stroke-width="0.5"/>
+            <ellipse id="shock3" cx="170" cy="435" rx="55" ry="13" fill="none" stroke="rgba(255,180,60,0.0)" stroke-width="0.8"/>
+            <ellipse id="shock3b" cx="170" cy="435" rx="65" ry="16" fill="none" stroke="rgba(255,150,0,0.0)" stroke-width="0.4"/>
+            <!-- Cross lines for Mach diamonds -->
+            <line id="shockLine1" x1="148" y1="330" x2="192" y2="330" stroke="rgba(255,180,60,0)" stroke-width="0.6"/>
+            <line id="shockLine2" x1="132" y1="377" x2="208" y2="377" stroke="rgba(255,180,60,0)" stroke-width="0.5"/>
+            <line id="shockLine3" x1="115" y1="422" x2="225" y2="422" stroke="rgba(255,180,60,0)" stroke-width="0.4"/>
+          </g>
+
+          <!-- Dimension callouts -->
+          <line x1="282" y1="60" x2="282" y2="214" stroke="rgba(0,200,255,0.2)" stroke-width="0.5" stroke-dasharray="2,2"/>
+          <text x="296" y="80" fill="rgba(0,200,255,0.3)" font-size="5.5" font-family="Share Tech Mono" transform="rotate(90 296 80)">Lc</text>
+
+          <!-- Side labels -->
+          <text x="8" y="65" fill="rgba(0,200,255,0.4)" font-size="5.5" font-family="Share Tech Mono">FUEL</text>
+          <text x="8" y="72" fill="rgba(0,200,255,0.4)" font-size="5.5" font-family="Share Tech Mono">IN</text>
+          <line x1="28" y1="68" x2="68" y2="90" stroke="rgba(0,200,255,0.2)" stroke-width="0.5" stroke-dasharray="2,2"/>
+          <text x="302" y="65" fill="rgba(255,150,0,0.4)" font-size="5.5" font-family="Share Tech Mono">OX</text>
+          <text x="302" y="72" fill="rgba(255,150,0,0.4)" font-size="5.5" font-family="Share Tech Mono">IN</text>
+          <line x1="312" y1="68" x2="272" y2="90" stroke="rgba(255,150,0,0.2)" stroke-width="0.5" stroke-dasharray="2,2"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- TELEMETRY -->
+    <div class="panel telemetry-panel">
+      <div class="panel-title">Live Telemetry</div>
+      <div class="telem-cards" id="telemCards"></div>
+    </div>
+
+    <!-- GRAPHS -->
+    <div class="panel graphs-panel">
+      <div class="panel-title">Performance Analytics</div>
+      <div class="graphs-grid">
+        <div>
+          <div class="chart-label">SPECIFIC IMPULSE vs O/F RATIO</div>
+          <div class="chart-wrap" style="height:200px;position:relative;">
+            <canvas id="ispChart"></canvas>
+          </div>
+        </div>
+        <div>
+          <div class="chart-label">THRUST vs CHAMBER PRESSURE</div>
+          <div class="chart-wrap" style="height:200px;position:relative;">
+            <canvas id="thrustChart"></canvas>
+          </div>
+        </div>
+        <div>
+          <div class="chart-label">TEMPERATURE PROFILE (AXIAL)</div>
+          <div class="chart-wrap" style="height:200px;position:relative;">
+            <canvas id="tempChart"></canvas>
+          </div>
+        </div>
+        <div>
+          <div class="chart-label">REAL-TIME EXHAUST VELOCITY</div>
+          <div class="chart-wrap" style="height:200px;position:relative;">
+            <canvas id="velChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHEMISTRY THEORY — upgraded -->
+    <div class="panel theory-panel">
+      <div class="panel-title">Chemistry Theory</div>
+      <div class="theory-content">
+        <div id="theoryPropTags" class="theory-propellant-tags"></div>
+        <div id="reactionEq" class="reaction-eq">Select propellants to see reaction</div>
+
+        <div id="theorySections"></div>
+
+        <div class="eq-box" style="margin-top:10px;">
+          <div class="eq-label">THRUST EQUATION</div>
+          F = ṁVe + (Pe − Pa)Ae
+        </div>
+        <div class="eq-box">
+          <div class="eq-label">EXHAUST VELOCITY</div>
+          Ve = Isp · g₀
+        </div>
+        <div class="eq-box">
+          <div class="eq-label">TSIOLKOVSKY ROCKET EQ</div>
+          Δv = Isp · g₀ · ln(m₀/mf)
+        </div>
+
+        <div id="theoryMeta" style="margin-top:8px;"></div>
+      </div>
+    </div>
+
+    <!-- FUEL COMPARISON MATRIX — upgraded with charts -->
+    <div class="panel matrix-panel">
+      <div class="panel-title">Fuel Comparison Matrix</div>
+      <div class="matrix-inner">
+        <div>
+          <div class="matrix-chart-label">ISP / DENSITY ISP / CHAMBER TEMP (÷10) BY FUEL</div>
+          <div class="matrix-chart-wrap">
+            <canvas id="matrixBarChart"></canvas>
+          </div>
+        </div>
+        <div>
+          <div class="matrix-chart-label">PERFORMANCE RADAR — SELECTED COMBO</div>
+          <div class="matrix-radar-wrap">
+            <canvas id="matrixRadarChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  TWINKLING STAR BACKGROUND
+// ═══════════════════════════════════════════════════════
+(function initStars() {
+  const canvas = document.getElementById('starsCanvas');
+  const ctx = canvas.getContext('2d');
+  let stars = [];
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+
+  function createStar() {
+    return {
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      r: Math.random() * 1.2 + 0.2,
+      alpha: Math.random(),
+      speed: 0.003 + Math.random() * 0.012,
+      phase: Math.random() * Math.PI * 2,
+      color: Math.random() > 0.85 ? '#00c8ff' : Math.random() > 0.7 ? '#ff9500' : '#c8e8f8'
+    };
+  }
+
+  function initStarField() {
+    stars = [];
+    const count = Math.floor((canvas.width * canvas.height) / 4000);
+    for (let i = 0; i < count; i++) stars.push(createStar());
+  }
+
+  function draw(t) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (const s of stars) {
+      s.phase += s.speed;
+      const a = (Math.sin(s.phase) * 0.5 + 0.5) * 0.6;
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.fillStyle = s.color;
+      ctx.shadowBlur = s.r > 0.9 ? 6 : 0;
+      ctx.shadowColor = s.color;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    requestAnimationFrame(draw);
+  }
+
+  resize();
+  initStarField();
+  window.addEventListener('resize', () => { resize(); initStarField(); });
+  requestAnimationFrame(draw);
+})();
+
+// ═══════════════════════════════════════════════════════
+//  DATA
+// ═══════════════════════════════════════════════════════
+const FUELS = [
+  { id:'lh2', name:'LH₂', isp:'450s', fullName:'Liquid Hydrogen', mol:'H₂', boiling:-253 },
+  { id:'kero', name:'RP-1', isp:'340s', fullName:'Kerosene (RP-1)', mol:'C₁₂H₂₄', boiling:175 },
+  { id:'mmh', name:'MMH', isp:'340s', fullName:'Monomethylhydrazine', mol:'CH₆N₂', boiling:87 },
+  { id:'n2h4', name:'N₂H₄', isp:'330s', fullName:'Hydrazine', mol:'N₂H₄', boiling:114 },
+  { id:'lch4', name:'LCH₄', isp:'380s', fullName:'Liquid Methane', mol:'CH₄', boiling:-161 },
+  { id:'ethanol', name:'EtOH', isp:'310s', fullName:'Ethanol', mol:'C₂H₅OH', boiling:78 },
+];
+
+const OXIDIZERS = [
+  { id:'lox', name:'LOX', fullName:'Liquid Oxygen', mol:'O₂' },
+  { id:'n2o4', name:'N₂O₄', fullName:'Nitrogen Tetroxide', mol:'N₂O₄' },
+  { id:'h2o2', name:'H₂O₂', fullName:'Hydrogen Peroxide', mol:'H₂O₂' },
+  { id:'n2o', name:'N₂O', fullName:'Nitrous Oxide', mol:'N₂O' },
+];
+
+const COMBOS = {
+  'lh2-lox':  { isp:450, Tc:3560, ofOpt:5.0, reaction:'2H₂ + O₂ → 2H₂O + energy',
+    mixtureNote:'Best performance near O/F 5.0. Deviation rapidly drops Isp and raises plume instability.',
+    pressureNote:'Higher Pc dramatically increases thrust and mass flow, but hydrogen cooling channels must handle extreme heat flux.',
+    useCase:'Upper Stage / Orbiter / Deep Space', risk:'Cryogenic (-253°C), very low density. Requires vacuum-jacketed tanks.',
+    exhaust:'Near-invisible UV/blue flame. Exhaust: H₂O only — cleanest biprop.' },
+  'kero-lox': { isp:350, Tc:3670, ofOpt:2.56, reaction:'2C₁₂H₂₄ + 37O₂ → 24CO₂ + 24H₂O',
+    mixtureNote:'Optimal at O/F 2.56. Rich mixtures cause soot; lean mixtures overheat chamber walls.',
+    pressureNote:'High Pc boosts efficiency but increases coking risk in cooling channels. Stage separation risk.',
+    useCase:'First Stage boosters (Falcon 9, Saturn V F-1)', risk:'Sooty exhaust. Carbon deposits in channels. Moderate toxicity.',
+    exhaust:'Bright orange-yellow sooty flame. Exhaust: CO₂ + H₂O + soot.' },
+  'lch4-lox': { isp:382, Tc:3533, ofOpt:3.55, reaction:'CH₄ + 2O₂ → CO₂ + 2H₂O',
+    mixtureNote:'Best performance near O/F 3.55. Your current deviation changes temperature, Isp, plume shape, and instability.',
+    pressureNote:'Higher Pc increases thrust and mass flow, but also raises cooling demand, chamber stress, injector sensitivity, and combustion risk.',
+    useCase:'Reusable engines / Mars ISRU (Starship)', risk:'Cryogenic, lower density than RP-1. Methane available on Mars.',
+    exhaust:'CO₂ + H₂O, cleaner than RP-1. Blue-tinged flame.' },
+  'mmh-n2o4': { isp:340, Tc:3200, ofOpt:1.65, reaction:'MMH + N₂O₄ → N₂ + CO₂ + H₂O',
+    mixtureNote:'Hypergolic — ignites on contact. O/F tuning affects exhaust temp and N₂ vs CO fractions.',
+    pressureNote:'Storable propellants allow moderate Pc. No ignition system needed; simplifies thrust chamber design.',
+    useCase:'Attitude control, spacecraft thrusters, upper stages (AJ10)', risk:'Highly toxic, carcinogenic. Requires full SCAPE suits.',
+    exhaust:'Reddish-brown plume. N₂ + CO₂ + H₂O exhaust.' },
+  'n2h4-n2o4': { isp:330, Tc:3100, ofOpt:1.38, reaction:'2N₂H₄ + N₂O₄ → 3N₂ + 4H₂O',
+    mixtureNote:'Hypergolic. Very stable combustion. O/F 1.38 is optimal for balanced N₂ output.',
+    pressureNote:'Standard heritage pressure ranges 0.5–3 MPa for spacecraft thrusters.',
+    useCase:'Deep space probes, attitude control (Viking, Voyager)', risk:'Extremely toxic. Probable human carcinogen. Strict handling.',
+    exhaust:'Violet-tinged plume from N₂ emission lines. Exhaust: N₂ + H₂O.' },
+  'n2h4-h2o2': { isp:300, Tc:1400, ofOpt:1.2, reaction:'N₂H₄ + 2H₂O₂ → N₂ + 4H₂O',
+    mixtureNote:'Cooler combustion than N₂H₄/N₂O₄. More benign but lower performance.',
+    pressureNote:'Low Tc means reduced cooling demand — suitable for simpler chamber designs.',
+    useCase:'Green-er propulsion, experimental systems', risk:'Hydrazine still toxic; H₂O₂ reactive. Better than N₂O₄.',
+    exhaust:'Near-colorless exhaust. Very low Tc makes chamber long-lasting.' },
+  'ethanol-lox': { isp:338, Tc:3400, ofOpt:1.3, reaction:'C₂H₅OH + 3O₂ → 2CO₂ + 3H₂O',
+    mixtureNote:'V-2 heritage fuel. Cooler wall temps than RP-1 allow film cooling. O/F 1.3 historically used.',
+    pressureNote:'Modest Pc typical. Ethanol film cooling prevents wall burnthrough.',
+    useCase:'Heritage systems (V-2, R-1), amateur rocketry', risk:'Non-toxic, food-grade. Low storage hazard.',
+    exhaust:'Green-tinged flame from C₂ Swan bands. Exhaust: CO₂ + H₂O.' },
+  'kero-n2o4': { isp:310, Tc:3500, ofOpt:3.4, reaction:'Hydrocarbon oxidation chain',
+    mixtureNote:'Storable alternative. Lower Isp than LOX-kerosene due to N₂O₄ molecular weight.',
+    pressureNote:'Non-cryogenic advantage for long-duration missions and military applications.',
+    useCase:'Military ICBMs, storable launch vehicles', risk:'N₂O₄ highly toxic. Kerosene manageable.',
+    exhaust:'Orange sooty plume with nitrogen oxide traces.' },
+  'lch4-n2o4': { isp:340, Tc:3200, ofOpt:2.2, reaction:'CH₄ + 2N₂O₄ → CO₂ + 2H₂O + 4NO',
+    mixtureNote:'Storable methane variant. Trades Isp for storability.',
+    pressureNote:'Allows non-cryogenic oxidizer with semi-clean fuel.',
+    useCase:'Storable methane applications', risk:'N₂O₄ toxicity dominates hazard profile.',
+    exhaust:'Mixed exhaust with NO compounds.' },
+  'lh2-h2o2': { isp:400, Tc:3000, ofOpt:7.0, reaction:'H₂ + H₂O₂ → H₂O + ½O₂ + H₂O',
+    mixtureNote:'Cleanest exhaust possible. Very high O/F ratio.',
+    pressureNote:'H₂O₂ concentration affects performance significantly. 90%+ needed.',
+    useCase:'Niche clean propulsion applications', risk:'H₂O₂ reactive oxidizer. LH₂ cryogenic.',
+    exhaust:'Near-invisible flame. Exhaust: H₂O only.' },
+  'ethanol-n2o': { isp:280, Tc:2700, ofOpt:1.3, reaction:'C₂H₅OH + 3N₂O → 2CO₂ + 3H₂O + 3N₂',
+    mixtureNote:'Popular amateur combination. N₂O self-pressurizing in flight.',
+    pressureNote:'N₂O vapor pressure provides self-pressurization — no pressurant needed.',
+    useCase:'Amateur and hybrid rocketry', risk:'Low hazard. N₂O is laughing gas. Very accessible.',
+    exhaust:'Green-tinted flame. Exhaust: CO₂ + H₂O + N₂.' },
+  'n2h4-lox': { isp:380, Tc:3300, ofOpt:0.98, reaction:'N₂H₄ + O₂ → N₂ + 2H₂O',
+    mixtureNote:'High performance with storable fuel + cryogenic oxidizer.',
+    pressureNote:'Near-stoichiometric O/F. Excellent Isp but toxicity challenges.',
+    useCase:'High performance spacecraft propulsion', risk:'Hydrazine toxicity remains key hazard.',
+    exhaust:'Violet-purple plume. Exhaust: N₂ + H₂O.' },
+};
+
+const MATRIX_DATA = [
+  { fuel:'LH₂', isp:450, densIsp:172, Tc:3560, thrust:95, clean:98, stor:30, ease:40 },
+  { fuel:'RP-1', isp:320, densIsp:330, Tc:3670, thrust:82, clean:45, stor:85, ease:80 },
+  { fuel:'LCH₄', isp:382, densIsp:290, Tc:3533, thrust:88, clean:80, stor:55, ease:60 },
+  { fuel:'MMH', isp:340, densIsp:350, Tc:3200, thrust:70, clean:30, stor:90, ease:50 },
+  { fuel:'EtOH', isp:338, densIsp:295, Tc:3400, thrust:72, clean:75, stor:88, ease:90 },
+];
+
+// ═══════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════
+let selectedFuel = 'lch4';
+let selectedOx = 'lox';
+let firing = false;
+let animFrame;
+let velHistory = [];
+let clockSeconds = 0;
+let clockInterval;
+let particles = [];
+let viewMode = 'cutaway'; // cutaway | thermal | hotfire
+
+// Toggle states
+const vizToggles = { labels: true, shock: true, cooling: true, injectors: true, audio: false };
+
+// ═══════════════════════════════════════════════════════
+//  VIZ TOGGLES
+// ═══════════════════════════════════════════════════════
+function toggleViz(key) {
+  vizToggles[key] = !vizToggles[key];
+  const btn = document.getElementById(`toggle${key.charAt(0).toUpperCase()+key.slice(1)}`);
+  const state = vizToggles[key] ? 'ON' : 'OFF';
+  if (key === 'audio') {
+    btn.textContent = `Audio: ${state}`;
+    btn.classList.toggle('on', vizToggles[key]);
+  } else {
+    btn.textContent = `${key.charAt(0).toUpperCase()+key.slice(1)}: ${state}`;
+    btn.classList.toggle('off', !vizToggles[key]);
+  }
+  applyToggles();
+}
+
+function applyToggles() {
+  // Labels
+  const labelGroup = document.getElementById('labelGroup');
+  if (labelGroup) labelGroup.style.opacity = vizToggles.labels ? '1' : '0';
+  const convLabel = document.getElementById('convLabel');
+  if (convLabel) convLabel.style.opacity = vizToggles.labels ? '1' : '0';
+  const throatLabel = document.getElementById('throatLabel');
+  if (throatLabel) throatLabel.style.opacity = vizToggles.labels ? '1' : '0';
+  const divLabel = document.getElementById('divLabel');
+  if (divLabel) divLabel.style.opacity = vizToggles.labels ? '1' : '0';
+  const nzLabelEl = document.getElementById('nzLabel');
+  if (nzLabelEl) nzLabelEl.style.opacity = vizToggles.labels ? '1' : '0';
+  const exitLabel = document.getElementById('exitLabel');
+  if (exitLabel) exitLabel.style.opacity = vizToggles.labels ? '1' : '0';
+  const throatDimLabel = document.getElementById('throatDimLabel');
+  if (throatDimLabel) throatDimLabel.style.opacity = vizToggles.labels ? '1' : '0';
+
+  // Shock diamonds
+  const shockGroup = document.getElementById('shockGroup');
+  if (shockGroup) shockGroup.style.transition = 'opacity 0.4s';
+
+  // Cooling
+  const regen = document.getElementById('regenCooling');
+  if (regen) regen.style.opacity = vizToggles.cooling ? '1' : '0';
+
+  // Injectors
+  const inj = document.getElementById('injSprays');
+  if (inj && firing) inj.setAttribute('opacity', vizToggles.injectors ? '1' : '0');
+}
+
+// ═══════════════════════════════════════════════════════
+//  VIEW MODE TABS
+// ═══════════════════════════════════════════════════════
+function setViewMode(mode) {
+  viewMode = mode;
+  document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(`tab-${mode}`).classList.add('active');
+
+  const thermalOverlay = document.getElementById('thermalOverlay');
+  if (mode === 'thermal') {
+    thermalOverlay.setAttribute('opacity', firing ? '0.7' : '0.4');
+  } else {
+    thermalOverlay.setAttribute('opacity', '0');
+  }
+  if (mode === 'hotfire' && !firing) {
+    startIgnition();
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  CALCULATIONS
+// ═══════════════════════════════════════════════════════
+function getComboKey() { return `${selectedFuel}-${selectedOx}`; }
+function getCombo() { return COMBOS[getComboKey()] || { isp:320, Tc:3000, ofOpt:2.0, reaction:'—', mixtureNote:'No data.', pressureNote:'No data.', useCase:'Unknown', risk:'Unknown', exhaust:'Unknown' }; }
+
+function calcIsp() {
+  const combo = getCombo();
+  const of = parseFloat(document.getElementById('ofSlider').value);
+  const ofOpt = combo.ofOpt;
+  const base = combo.isp;
+  const diff = Math.abs(of - ofOpt) / ofOpt;
+  return Math.round(base * Math.max(0.75, 1 - diff * 0.4));
+}
+
+function calcThrust() {
+  const Pc = parseFloat(document.getElementById('pcSlider').value);
+  const dt = parseFloat(document.getElementById('dtSlider').value) / 1000;
+  const At = Math.PI * (dt/2)**2;
+  const isp = calcIsp();
+  return Math.round(isp * 9.81 * Pc * 1e6 * At / (isp * 9.81) * 1000) / 1000;
+}
+
+function calcExhaustVel() { return Math.round(calcIsp() * 9.81); }
+
+function calcTemp() {
+  const combo = getCombo();
+  const Pc = parseFloat(document.getElementById('pcSlider').value);
+  return Math.round(combo.Tc * (1 + 0.05 * Math.log(Pc)));
+}
+
+function calcMassFlow() {
+  const Pc = parseFloat(document.getElementById('pcSlider').value);
+  const dt = parseFloat(document.getElementById('dtSlider').value) / 1000;
+  const At = Math.PI * (dt/2)**2;
+  return (Pc * 1e6 * At / (calcIsp() * 9.81)).toFixed(2);
+}
+
+function calcDeltaV(mRatio=8) {
+  return Math.round(calcIsp() * 9.81 * Math.log(mRatio));
+}
+
+// ═══════════════════════════════════════════════════════
+//  RENDER FUEL/OX GRIDS
+// ═══════════════════════════════════════════════════════
+function renderFuelGrid() {
+  document.getElementById('fuelGrid').innerHTML = FUELS.map(f => `
+    <button class="fuel-btn ${f.id===selectedFuel?'active':''}" onclick="selectFuel('${f.id}')">
+      <div class="fuel-name">${f.name}</div>
+      <div class="fuel-isp">${f.isp} vac</div>
+    </button>`).join('');
+}
+
+function renderOxGrid() {
+  document.getElementById('oxGrid').innerHTML = OXIDIZERS.map(o => `
+    <button class="fuel-btn ${o.id===selectedOx?'active':''}" onclick="selectOx('${o.id}')">
+      <div class="fuel-name">${o.name}</div>
+      <div class="fuel-isp">${o.fullName.split(' ')[0]}</div>
+    </button>`).join('');
+}
+
+function selectFuel(id) { selectedFuel=id; renderFuelGrid(); update(); }
+function selectOx(id) { selectedOx=id; renderOxGrid(); update(); }
+
+// ═══════════════════════════════════════════════════════
+//  RENDER TELEMETRY
+// ═══════════════════════════════════════════════════════
+function renderTelemetry() {
+  const isp = calcIsp();
+  const ve = calcExhaustVel();
+  const Tc = calcTemp();
+  const Pc = parseFloat(document.getElementById('pcSlider').value);
+  const mf = calcMassFlow();
+  const dv = calcDeltaV();
+  const ispPct = Math.round((isp/460)*100);
+  const tPct = Math.round((Tc/4000)*100);
+  const vPct = Math.round((ve/4500)*100);
+
+  const cards = [
+    { label:'SPECIFIC IMPULSE', val:isp, unit:'sec', pct:ispPct, cls:isp>380?'ok':isp>300?'':'warn' },
+    { label:'EXHAUST VELOCITY', val:ve, unit:'m/s', pct:vPct, cls:'ok' },
+    { label:'CHAMBER TEMP', val:Tc, unit:'K', pct:tPct, cls:Tc>3800?'danger':Tc>3000?'warn':'' },
+    { label:'CHAMBER PRESS', val:Pc.toFixed(1), unit:'MPa', pct:Math.round((Pc/20)*100), cls:Pc>15?'warn':'' },
+    { label:'MASS FLOW RATE', val:mf, unit:'kg/s', pct:Math.round((mf/50)*100), cls:'' },
+    { label:'Δv CAPABILITY', val:dv, unit:'m/s', pct:Math.round((dv/10000)*100), cls:'ok' },
+  ];
+
+  document.getElementById('telemCards').innerHTML = cards.map(c => `
+    <div class="telem-card ${c.cls}">
+      <div class="telem-label">${c.label}</div>
+      <div class="telem-value">${c.val} <span class="telem-unit">${c.unit}</span></div>
+      <div class="telem-bar"><div class="telem-bar-fill" style="width:${c.pct}%"></div></div>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════
+//  RENDER CHEMISTRY THEORY (upgraded)
+// ═══════════════════════════════════════════════════════
+function renderChemistry() {
+  const combo = getCombo();
+  const fuel = FUELS.find(f=>f.id===selectedFuel);
+  const ox = OXIDIZERS.find(o=>o.id===selectedOx);
+
+  document.getElementById('theoryPropTags').innerHTML = [
+    `<span class="theory-tag">${fuel?.fullName||''}</span>`,
+    `<span class="theory-tag ox-tag">${ox?.fullName||''}</span>`,
+    `<span class="theory-tag mol-tag">${fuel?.mol||''}</span>`,
+  ].join('');
+
+  document.getElementById('reactionEq').textContent = combo.reaction;
+
+  document.getElementById('theorySections').innerHTML = `
+    <div class="theory-section">
+      <div class="theory-section-title">Mixture ratio:</div>
+      <div class="theory-section-body">${combo.mixtureNote}</div>
+    </div>
+    <div class="theory-section">
+      <div class="theory-section-title">Pressure:</div>
+      <div class="theory-section-body">${combo.pressureNote}</div>
+    </div>
+  `;
+
+  document.getElementById('theoryMeta').innerHTML = `
+    <div class="theory-meta">
+      <div class="theory-meta-label">USE CASE</div>
+      <div class="theory-meta-val">${combo.useCase}</div>
+    </div>
+    <div class="theory-meta theory-risk">
+      <div class="theory-meta-label">RISK</div>
+      <div class="theory-meta-val" style="color:var(--yellow)">${combo.risk}</div>
+    </div>
+    <div class="theory-meta" style="border-left-color:var(--cyan);margin-top:6px;">
+      <div class="theory-meta-label">EXHAUST</div>
+      <div class="theory-meta-val">${combo.exhaust}</div>
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════════════════
+//  CHARTS — performance + matrix
+// ═══════════════════════════════════════════════════════
+let ispChart, thrustChart, tempChart, velChart, matrixBarChart, matrixRadarChart;
+
+function initCharts() {
+  const baseOpts = {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{display:false} },
+    scales:{
+      x:{ grid:{color:'rgba(0,200,255,0.05)'}, ticks:{color:'#6a9ab8',font:{size:9,family:'Share Tech Mono'}} },
+      y:{ grid:{color:'rgba(0,200,255,0.05)'}, ticks:{color:'#6a9ab8',font:{size:9,family:'Share Tech Mono'}} }
+    }
+  };
+
+  ispChart = new Chart(document.getElementById('ispChart'), {
+    type:'line',
+    data:{ labels:[], datasets:[{ label:'Isp', data:[], borderColor:'#00c8ff', borderWidth:1.5, pointRadius:0, fill:true, backgroundColor:'rgba(0,200,255,0.05)' }] },
+    options:{ ...baseOpts, animation:{duration:300} }
+  });
+
+  thrustChart = new Chart(document.getElementById('thrustChart'), {
+    type:'line',
+    data:{ labels:[], datasets:[{ label:'Thrust', data:[], borderColor:'#ff6a00', borderWidth:1.5, pointRadius:0, fill:true, backgroundColor:'rgba(255,106,0,0.05)' }] },
+    options:{ ...baseOpts, animation:{duration:300} }
+  });
+
+  tempChart = new Chart(document.getElementById('tempChart'), {
+    type:'line',
+    data:{
+      labels:['Injector','Pre-comb','Comb Peak','Throat','Nozzle Mid','Exit'],
+      datasets:[{ label:'Temp', data:[], borderColor:'#ffd700', borderWidth:1.5, pointRadius:3, pointBackgroundColor:'#ffd700', fill:true, backgroundColor:'rgba(255,215,0,0.05)' }]
+    },
+    options:{ ...baseOpts, animation:{duration:400} }
+  });
+
+  velChart = new Chart(document.getElementById('velChart'), {
+    type:'line',
+    data:{ labels:[], datasets:[{ label:'Ve', data:[], borderColor:'#00ff88', borderWidth:1, pointRadius:0, fill:false }] },
+    options:{ ...baseOpts, animation:{duration:0} }
+  });
+
+  // Matrix bar chart
+  matrixBarChart = new Chart(document.getElementById('matrixBarChart'), {
+    type:'bar',
+    data:{
+      labels: MATRIX_DATA.map(d=>d.fuel),
+      datasets:[
+        { label:'Isp (s)', data: MATRIX_DATA.map(d=>d.isp), backgroundColor:'rgba(0,200,255,0.7)', borderColor:'#00c8ff', borderWidth:1 },
+        { label:'Density Isp', data: MATRIX_DATA.map(d=>d.densIsp), backgroundColor:'rgba(0,255,136,0.6)', borderColor:'#00ff88', borderWidth:1 },
+        { label:'Tc/10', data: MATRIX_DATA.map(d=>Math.round(d.Tc/10)), backgroundColor:'rgba(255,215,0,0.6)', borderColor:'#ffd700', borderWidth:1 },
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:true, labels:{ color:'#6a9ab8', font:{size:9,family:'Share Tech Mono'}, boxWidth:10 } } },
+      scales:{
+        x:{ grid:{color:'rgba(0,200,255,0.05)'}, ticks:{color:'#6a9ab8',font:{size:9,family:'Share Tech Mono'}} },
+        y:{ grid:{color:'rgba(0,200,255,0.05)'}, ticks:{color:'#6a9ab8',font:{size:9,family:'Share Tech Mono'}} }
+      }
+    }
+  });
+
+  // Matrix radar chart
+  matrixRadarChart = new Chart(document.getElementById('matrixRadarChart'), {
+    type:'radar',
+    data:{
+      labels:['Thrust','Clean','Storage','Ease','Density'],
+      datasets:[{
+        label:'Selected Combo',
+        data:[85, 80, 55, 60, 60],
+        borderColor:'#00c8ff', borderWidth:1.5,
+        backgroundColor:'rgba(0,200,255,0.12)',
+        pointBackgroundColor:'#00c8ff', pointRadius:3
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{
+        r:{
+          grid:{ color:'rgba(0,200,255,0.12)' },
+          angleLines:{ color:'rgba(0,200,255,0.15)' },
+          ticks:{ display:false },
+          pointLabels:{ color:'#6a9ab8', font:{size:9,family:'Share Tech Mono'} },
+          min:0, max:100
+        }
+      }
+    }
+  });
+}
+
+function updateRadar() {
+  const combo = getCombo();
+  const fuel = FUELS.find(f=>f.id===selectedFuel);
+  const row = MATRIX_DATA.find(d=>d.fuel===fuel?.name) || MATRIX_DATA[2];
+  const Pc = parseFloat(document.getElementById('pcSlider').value);
+  const thrust = Math.min(100, Math.round(row.thrust * (0.5 + Pc/40)));
+  matrixRadarChart.data.datasets[0].data = [thrust, row.clean, row.stor, row.ease, Math.round(row.densIsp/3.5)];
+  matrixRadarChart.update();
+
+  // Highlight active bar
+  const fuelIdx = MATRIX_DATA.findIndex(d=>d.fuel===fuel?.name);
+  matrixBarChart.data.datasets.forEach(ds => {
+    ds.backgroundColor = ds.backgroundColor instanceof Array ? ds.backgroundColor : Array(MATRIX_DATA.length).fill(ds.backgroundColor);
+    // reset handled by Chart.js internally; just update
+  });
+  matrixBarChart.update();
+}
+
+function updateCharts() {
+  const combo = getCombo();
+  const of = parseFloat(document.getElementById('ofSlider').value);
+  const Pc = parseFloat(document.getElementById('pcSlider').value);
+  const ofOpt = combo.ofOpt;
+  const baseIsp = combo.isp;
+
+  const ofVals = [], ispVals = [];
+  for(let r=0.5; r<=8; r+=0.25) {
+    ofVals.push(r.toFixed(2));
+    const diff = Math.abs(r - ofOpt) / ofOpt;
+    ispVals.push(Math.round(baseIsp * Math.max(0.75, 1 - diff*0.4)));
+  }
+  ispChart.data.labels = ofVals;
+  ispChart.data.datasets[0].data = ispVals;
+  ispChart.update();
+
+  const pcVals = [], thrustVals = [];
+  for(let p=0.5; p<=20; p+=0.5) {
+    pcVals.push(p.toFixed(1));
+    const dt = parseFloat(document.getElementById('dtSlider').value) / 1000;
+    const At = Math.PI*(dt/2)**2;
+    thrustVals.push(Math.round(calcIsp() * 9.81 * p*1e6 * At / (calcIsp()*9.81) * 1000)/1000);
+  }
+  thrustChart.data.labels = pcVals;
+  thrustChart.data.datasets[0].data = thrustVals;
+  thrustChart.update();
+
+  const Tc = calcTemp();
+  const tProfile = [350, Tc*0.6, Tc, Tc*0.85, Tc*0.5, Tc*0.15];
+  tempChart.data.datasets[0].data = tProfile.map(v=>Math.round(v));
+  tempChart.update();
+
+  const ve = calcExhaustVel();
+  velHistory.push(ve);
+  if(velHistory.length > 40) velHistory.shift();
+  velChart.data.labels = velHistory.map((_,i)=>i);
+  velChart.data.datasets[0].data = [...velHistory];
+  velChart.update();
+
+  updateRadar();
+}
+
+function updateSVGLabels() {
+  const Pc = parseFloat(document.getElementById('pcSlider').value);
+  const nz = parseInt(document.getElementById('nzSlider').value);
+  const dt = parseInt(document.getElementById('dtSlider').value);
+  const lbl = document.getElementById('pcLabel');
+  if(lbl) lbl.textContent = Pc.toFixed(1)+' MPa';
+  const nzl = document.getElementById('nzLabel');
+  if(nzl) nzl.textContent = 'ε = '+nz+':1';
+  const tdl = document.getElementById('throatDimLabel');
+  if(tdl) tdl.textContent = 'Dt = '+dt+' mm';
+}
+
+function update() {
+  const of = parseFloat(document.getElementById('ofSlider').value);
+  const Pc = parseFloat(document.getElementById('pcSlider').value);
+  const nz = parseInt(document.getElementById('nzSlider').value);
+  const dt = parseInt(document.getElementById('dtSlider').value);
+
+  document.getElementById('ofVal').textContent = of.toFixed(1);
+  document.getElementById('pcVal').textContent = Pc.toFixed(1)+' MPa';
+  document.getElementById('nzVal').textContent = nz+':1';
+  document.getElementById('dtVal').textContent = dt+' mm';
+
+  renderTelemetry();
+  renderChemistry();
+  updateCharts();
+  updateSVGLabels();
+  applyToggles();
+}
+
+// ═══════════════════════════════════════════════════════
+//  FLAME COLORS (fuel × oxidizer)
+// ═══════════════════════════════════════════════════════
+const FLAME_COLORS = {
+  'lh2-lox':  { core:'#e0f4ff', mid:'#80d4ff', outer:'#3090d0', tip:'#1060a0', hot:'#001828', particle:['#d0eeff','#80c8ff','#4090d0','#ffffff'] },
+  'lh2-h2o2': { core:'#c0e8ff', mid:'#60b8f0', outer:'#2878c0', tip:'#104080', hot:'#00121e', particle:['#b0d8ff','#70b0e8','#3878c0','#ffffff'] },
+  'lh2-n2o4': { core:'#d8eeff', mid:'#70c0e8', outer:'#3080c0', tip:'#105090', hot:'#001428', particle:['#c8e4ff','#78b8e8','#4088c8','#ffffff'] },
+  'lh2-n2o':  { core:'#c8e4ff', mid:'#60b0e0', outer:'#2870b8', tip:'#104080', hot:'#001020', particle:['#b8d8ff','#60a8e0','#3878c8','#ffffff'] },
+  'kero-lox':  { core:'#ffffa0', mid:'#ffaa00', outer:'#e05000', tip:'#802800', hot:'#280a00', particle:['#ffcc40','#ff8800','#e04000','#ffffff'] },
+  'kero-n2o4': { core:'#ffee80', mid:'#ff9900', outer:'#cc4400', tip:'#701800', hot:'#200800', particle:['#ffbb30','#ff7700','#cc3300','#ffe060'] },
+  'kero-h2o2': { core:'#fff080', mid:'#ffb000', outer:'#d05800', tip:'#782000', hot:'#240900', particle:['#ffd040','#ff8800','#d04000','#ffffff'] },
+  'kero-n2o':  { core:'#ffee90', mid:'#ffa000', outer:'#cc4800', tip:'#702000', hot:'#220900', particle:['#ffcc40','#ff7800','#c83800','#ffd050'] },
+  'mmh-n2o4': { core:'#ffb060', mid:'#ff5500', outer:'#aa1800', tip:'#600800', hot:'#1a0400', particle:['#ff8840','#ff4400','#bb2000','#ffcc80'] },
+  'mmh-h2o2': { core:'#ffaa50', mid:'#ff5000', outer:'#a81400', tip:'#580600', hot:'#180300', particle:['#ff8030','#ff3800','#b01800','#ffc070'] },
+  'mmh-lox':  { core:'#ffc080', mid:'#ff6600', outer:'#bb2200', tip:'#660800', hot:'#1c0400', particle:['#ff9040','#ff5000','#cc2400','#ffd090'] },
+  'mmh-n2o':  { core:'#ffaa60', mid:'#ff5200', outer:'#aa1800', tip:'#600800', hot:'#1a0400', particle:['#ff8840','#ff4200','#b81c00','#ffc880'] },
+  'n2h4-n2o4': { core:'#ffccff', mid:'#cc44cc', outer:'#881488', tip:'#440044', hot:'#100010', particle:['#ffaaff','#cc44cc','#991199','#ff88ff'] },
+  'n2h4-h2o2': { core:'#ffddff', mid:'#dd66dd', outer:'#992299', tip:'#550055', hot:'#110011', particle:['#ffbbff','#dd55dd','#aa22aa','#ffaaff'] },
+  'n2h4-lox':  { core:'#ffbbff', mid:'#bb33bb', outer:'#771177', tip:'#440044', hot:'#0e000e', particle:['#ff99ff','#bb33bb','#881188','#ff77ff'] },
+  'n2h4-n2o':  { core:'#ffccff', mid:'#cc44cc', outer:'#881488', tip:'#440044', hot:'#100010', particle:['#ffaaff','#cc44cc','#991199','#ff88ff'] },
+  'lch4-lox':  { core:'#ffeedd', mid:'#ffcc44', outer:'#ff7700', tip:'#993300', hot:'#1a0800', particle:['#ffd860','#ffaa00','#ff6600','#ffffff'] },
+  'lch4-n2o4': { core:'#ffeecc', mid:'#ffbb33', outer:'#ff6600', tip:'#882200', hot:'#180600', particle:['#ffd050','#ff9900','#ff5500','#ffe090'] },
+  'lch4-h2o2': { core:'#fff0e0', mid:'#ffcc55', outer:'#ff8800', tip:'#994400', hot:'#1c0900', particle:['#ffe070','#ffbb00','#ff7700','#ffffff'] },
+  'lch4-n2o':  { core:'#ffeecc', mid:'#ffbb33', outer:'#ff6600', tip:'#882200', hot:'#180600', particle:['#ffd050','#ff9900','#ff5500','#ffe090'] },
+  'ethanol-lox':  { core:'#e8fff0', mid:'#88ffbb', outer:'#22cc66', tip:'#008833', hot:'#001a08', particle:['#aaffcc','#44dd88','#22aa55','#ffffff'] },
+  'ethanol-n2o4': { core:'#eeffee', mid:'#88ee99', outer:'#33bb55', tip:'#118833', hot:'#001206', particle:['#99ffaa','#44dd77','#22aa44','#ccffdd'] },
+  'ethanol-h2o2': { core:'#e8fff0', mid:'#80ffaa', outer:'#20cc55', tip:'#008822', hot:'#001505', particle:['#aaffbb','#44cc77','#22994c','#eeffee'] },
+  'ethanol-n2o':  { core:'#e0ffec', mid:'#70ee99', outer:'#18bb44', tip:'#007722', hot:'#001004', particle:['#99ffaa','#44cc66','#229944','#ccffdd'] },
+};
+
+function getFlameColors() {
+  return FLAME_COLORS[`${selectedFuel}-${selectedOx}`] || { core:'#ffffa0', mid:'#ff8800', outer:'#ff3300', tip:'#881100', hot:'#1a0500', particle:['#ffaa00','#ff6600','#ff3300','#ffffff'] };
+}
+
+// ═══════════════════════════════════════════════════════
+//  SHOCK DIAMOND TWINKLING ANIMATION
+// ═══════════════════════════════════════════════════════
+let shockAnimFrame;
+let shockPhases = [0, 1.2, 2.4];
+
+function animateShockDiamonds() {
+  if(!firing || !vizToggles.shock) {
+    ['shock1','shock1b','shock2','shock2b','shock3','shock3b','shockLine1','shockLine2','shockLine3'].forEach(id => {
+      const el = document.getElementById(id);
+      if(el) el.setAttribute('stroke-opacity','0');
+    });
+    return;
+  }
+  shockPhases = shockPhases.map(p => p + 0.04);
+  const Pc = parseFloat(document.getElementById('pcSlider').value);
+  const nz = parseInt(document.getElementById('nzSlider').value);
+  // Shock visibility depends on nozzle expansion and pressure
+  const shockStrength = Math.min(1, (nz / 60) * (Pc / 8));
+
+  const intensities = shockPhases.map(p => (Math.sin(p) * 0.5 + 0.5) * shockStrength);
+
+  const ids = ['shock1','shock1b','shock2','shock2b','shock3','shock3b'];
+  const opacities = [intensities[0]*0.9, intensities[0]*0.5, intensities[1]*0.75, intensities[1]*0.4, intensities[2]*0.6, intensities[2]*0.3];
+  ids.forEach((id, i) => {
+    const el = document.getElementById(id);
+    if(el) el.setAttribute('stroke-opacity', opacities[i].toFixed(3));
+  });
+
+  const lineIds = ['shockLine1','shockLine2','shockLine3'];
+  lineIds.forEach((id,i) => {
+    const el = document.getElementById(id);
+    if(el) el.setAttribute('stroke-opacity', (intensities[i]*0.5).toFixed(3));
+  });
+
+  shockAnimFrame = requestAnimationFrame(animateShockDiamonds);
+}
+
+function stopShockAnimation() {
+  cancelAnimationFrame(shockAnimFrame);
+  ['shock1','shock1b','shock2','shock2b','shock3','shock3b','shockLine1','shockLine2','shockLine3'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.setAttribute('stroke-opacity','0');
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+//  APPLY FLAME COLORS
+// ═══════════════════════════════════════════════════════
+function applyFlameColors() {
+  const fc = getFlameColors();
+  const Pc = parseFloat(document.getElementById('pcSlider').value);
+  const nz = parseInt(document.getElementById('nzSlider').value);
+  const scale = Math.min(1.8, 0.35 + Pc * 0.075);
+  const spread = Math.min(1.5, 0.7 + nz * 0.004);
+  const exitY = 472;
+  const baseW = 60 * spread;
+  const baseH = 70 * scale;
+  const secW  = 100 * spread;
+  const secH  = 90 * scale;
+
+  const fb = document.getElementById('flameBody');
+  if(fb && firing) {
+    fb.setAttribute('d', `M${170-baseW} ${exitY} Q${170-baseW*0.5} ${exitY+baseH*0.7} 170 ${exitY+baseH} Q${170+baseW*0.5} ${exitY+baseH*0.7} ${170+baseW} ${exitY} Z`);
+  }
+  const fs = document.getElementById('flameSec');
+  if(fs && firing) {
+    fs.setAttribute('d', `M${170-secW} ${exitY} Q${170-secW*0.5} ${exitY+secH*0.7} 170 ${exitY+secH} Q${170+secW*0.5} ${exitY+secH*0.7} ${170+secW} ${exitY} Z`);
+    fs.setAttribute('opacity', '0.45');
+  }
+  const tg = document.getElementById('throatGlow');
+  if(tg) tg.setAttribute('fill', fc.mid);
+  const hi = document.getElementById('hotInterior');
+  if(hi) hi.setAttribute('fill', fc.hot);
+  const fcore = document.getElementById('flameCore');
+  if(fcore) fcore.setAttribute('fill', fc.core);
+
+  // Thermal view
+  if(viewMode === 'thermal') {
+    const to = document.getElementById('thermalOverlay');
+    if(to) to.setAttribute('opacity', '0.65');
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  WEB AUDIO
+// ═══════════════════════════════════════════════════════
+let audioCtx = null;
+let rumbleGain1=null, rumbleGain2=null, rumbleFilter1=null, rumbleFilter2=null;
+let rumbleSrc1=null, rumbleSrc2=null;
+let rumbleRunning = false;
+
+function getAudioCtx() {
+  if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function getAudioParams() {
+  const Pc = parseFloat(document.getElementById('pcSlider').value);
+  const of = parseFloat(document.getElementById('ofSlider').value);
+  const vol  = Math.min(0.30, 0.06 + Pc * 0.012);
+  const freq1 = Math.max(40, 110 - Pc * 3.5);
+  const freq2 = Math.max(180, 280 + of * 15);
+  const volCrackle = vol * (0.2 + Math.abs(of - 3) * 0.05);
+  return { vol, freq1, freq2, volCrackle };
+}
+
+function updateRumbleParams() {
+  if(!rumbleRunning || !rumbleGain1 || !vizToggles.audio) return;
+  const p = getAudioParams();
+  const ctx = getAudioCtx();
+  const t = ctx.currentTime;
+  rumbleGain1.gain.linearRampToValueAtTime(p.vol, t + 0.15);
+  rumbleGain2.gain.linearRampToValueAtTime(p.volCrackle, t + 0.15);
+  rumbleFilter1.frequency.linearRampToValueAtTime(p.freq1, t + 0.2);
+  rumbleFilter2.frequency.linearRampToValueAtTime(p.freq2, t + 0.2);
+}
+
+function playIgnitionSound() {
+  if(!vizToggles.audio) return;
+  const ctx = getAudioCtx();
+  if(ctx.state === 'suspended') ctx.resume();
+  const crackBuf = ctx.createBuffer(1, ctx.sampleRate * 0.2, ctx.sampleRate);
+  const cd = crackBuf.getChannelData(0);
+  for(let i=0;i<cd.length;i++) cd[i] = (Math.random()*2-1) * Math.pow(1-i/cd.length, 2.2);
+  const crackSrc = ctx.createBufferSource(); crackSrc.buffer = crackBuf;
+  const crackF = ctx.createBiquadFilter(); crackF.type='bandpass'; crackF.frequency.value=900; crackF.Q.value=0.4;
+  const crackG = ctx.createGain();
+  crackG.gain.setValueAtTime(1.6, ctx.currentTime);
+  crackG.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.2);
+  crackSrc.connect(crackF); crackF.connect(crackG); crackG.connect(ctx.destination);
+  crackSrc.start(ctx.currentTime);
+
+  const thudOsc = ctx.createOscillator();
+  thudOsc.type = 'sine';
+  thudOsc.frequency.setValueAtTime(70, ctx.currentTime);
+  thudOsc.frequency.exponentialRampToValueAtTime(22, ctx.currentTime+0.4);
+  const thudG = ctx.createGain();
+  thudG.gain.setValueAtTime(1.3, ctx.currentTime);
+  thudG.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.4);
+  thudOsc.connect(thudG); thudG.connect(ctx.destination);
+  thudOsc.start(ctx.currentTime); thudOsc.stop(ctx.currentTime+0.4);
+}
+
+function startRumble() {
+  if(!vizToggles.audio) return;
+  const ctx = getAudioCtx();
+  if(ctx.state === 'suspended') ctx.resume();
+  stopRumble();
+  const p = getAudioParams();
+  const bufLen = ctx.sampleRate * 3;
+  const buf1 = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+  const d1 = buf1.getChannelData(0);
+  for(let i=0;i<bufLen;i++) d1[i] = Math.random()*2-1;
+  rumbleSrc1 = ctx.createBufferSource(); rumbleSrc1.buffer=buf1; rumbleSrc1.loop=true;
+  rumbleFilter1 = ctx.createBiquadFilter(); rumbleFilter1.type='lowpass'; rumbleFilter1.frequency.value=p.freq1;
+  rumbleGain1 = ctx.createGain(); rumbleGain1.gain.value=p.vol;
+  rumbleSrc1.connect(rumbleFilter1); rumbleFilter1.connect(rumbleGain1); rumbleGain1.connect(ctx.destination);
+  rumbleSrc1.start();
+  const buf2 = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+  const d2 = buf2.getChannelData(0);
+  for(let i=0;i<bufLen;i++) d2[i] = Math.random()*2-1;
+  rumbleSrc2 = ctx.createBufferSource(); rumbleSrc2.buffer=buf2; rumbleSrc2.loop=true;
+  rumbleFilter2 = ctx.createBiquadFilter(); rumbleFilter2.type='bandpass'; rumbleFilter2.frequency.value=p.freq2; rumbleFilter2.Q.value=0.6;
+  rumbleGain2 = ctx.createGain(); rumbleGain2.gain.value=p.volCrackle;
+  rumbleSrc2.connect(rumbleFilter2); rumbleFilter2.connect(rumbleGain2); rumbleGain2.connect(ctx.destination);
+  rumbleSrc2.start();
+  rumbleRunning = true;
+}
+
+function stopRumble() {
+  rumbleRunning = false;
+  [rumbleSrc1, rumbleSrc2].forEach(n => { try { if(n) n.stop(); } catch(e){} });
+  [rumbleGain1, rumbleGain2].forEach(n => { try { if(n) n.disconnect(); } catch(e){} });
+  rumbleSrc1=rumbleSrc2=rumbleGain1=rumbleGain2=rumbleFilter1=rumbleFilter2=null;
+}
+
+function playShutdownSound() {
+  if(!vizToggles.audio) return;
+  const ctx = getAudioCtx();
+  if(ctx.state === 'suspended') ctx.resume();
+  const osc = ctx.createOscillator();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(110, ctx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(18, ctx.currentTime+0.7);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.28, ctx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.7);
+  const f = ctx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=220;
+  osc.connect(f); f.connect(g); g.connect(ctx.destination);
+  osc.start(ctx.currentTime); osc.stop(ctx.currentTime+0.7);
+}
+
+// ═══════════════════════════════════════════════════════
+//  IGNITION
+// ═══════════════════════════════════════════════════════
+function toggleIgnition() {
+  if(!firing) startIgnition();
+  else stopIgnition();
+}
+
+function startIgnition() {
+  firing = true;
+  document.getElementById('igniteBtn').textContent = '◈ ENGINE FIRING';
+  document.getElementById('igniteBtn').classList.add('firing');
+
+  playIgnitionSound();
+  setTimeout(startRumble, 450);
+
+  const fireEls = ['flameCore','flameBody','flameSec','throatGlow','hotInterior','hotspot'];
+  fireEls.forEach(id => document.getElementById(id).setAttribute('opacity', id==='flameSec'?'0.45':'1'));
+
+  if(vizToggles.injectors) document.getElementById('injSprays').setAttribute('opacity','1');
+
+  applyFlameColors();
+  animateShockDiamonds();
+
+  if(viewMode === 'thermal') {
+    document.getElementById('thermalOverlay').setAttribute('opacity', '0.7');
+  }
+
+  clockInterval = setInterval(()=>{
+    clockSeconds++;
+    const h = String(Math.floor(clockSeconds/3600)).padStart(2,'0');
+    const m = String(Math.floor((clockSeconds%3600)/60)).padStart(2,'0');
+    const s = String(clockSeconds%60).padStart(2,'0');
+    document.getElementById('clock').textContent = `T+${h}:${m}:${s}`;
+  }, 1000);
+
+  initParticles();
+  animateParticles();
+}
+
+function stopIgnition() {
+  firing = false;
+  document.getElementById('igniteBtn').textContent = '◈ IGNITE ENGINE';
+  document.getElementById('igniteBtn').classList.remove('firing');
+
+  stopRumble();
+  playShutdownSound();
+  stopShockAnimation();
+
+  ['flameCore','flameBody','flameSec','throatGlow','hotInterior','hotspot','injSprays']
+    .forEach(id => document.getElementById(id).setAttribute('opacity','0'));
+
+  document.getElementById('thermalOverlay').setAttribute('opacity','0');
+
+  clearInterval(clockInterval);
+  cancelAnimationFrame(animFrame);
+  const ctx2d = document.getElementById('particleCanvas').getContext('2d');
+  ctx2d.clearRect(0,0,ctx2d.canvas.width,ctx2d.canvas.height);
+  particles = [];
+}
+
+function abort() {
+  stopIgnition();
+  clockSeconds = 0;
+  document.getElementById('clock').textContent = 'T+00:00:00';
+}
+
+// ═══════════════════════════════════════════════════════
+//  PARTICLES
+// ═══════════════════════════════════════════════════════
+function initParticles() {
+  particles = [];
+  const canvas = document.getElementById('particleCanvas');
+  canvas.width = canvas.offsetWidth;
+  canvas.height = canvas.offsetHeight;
+}
+
+function spawnParticle(canvas) {
+  const cx = canvas.width/2;
+  const cy = canvas.height * 0.88;
+  const Pc = parseFloat(document.getElementById('pcSlider').value);
+  const nz = parseInt(document.getElementById('nzSlider').value);
+  const fc = getFlameColors();
+  const speed = 2.5 + Pc * 0.45 + Math.random()*3;
+  const halfAngle = 0.2 + nz * 0.003;
+  const angle = (Math.PI/2) + (Math.random()-0.5)*halfAngle*2;
+  const palette = fc.particle;
+  const hue = palette[Math.floor(Math.random()*palette.length)];
+  const size = (2 + Pc * 0.25 + Math.random()*5) * (0.8 + Math.random()*0.4);
+  return {
+    x: cx + (Math.random()-0.5) * (20 + nz * 0.4),
+    y: cy,
+    vx: Math.cos(angle)*speed*(Math.random()*0.55+0.45),
+    vy: Math.sin(angle)*speed,
+    life:1,
+    decay: 0.011 + Math.random()*0.015,
+    size, hue
+  };
+}
+
+function animateParticles() {
+  if(!firing) return;
+  const canvas = document.getElementById('particleCanvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const Pc = parseFloat(document.getElementById('pcSlider').value);
+  const n = Math.round(4 + Pc * 2.2);
+  for(let i=0;i<n;i++) particles.push(spawnParticle(canvas));
+  particles = particles.filter(p=>p.life>0);
+  for(const p of particles) {
+    p.x += p.vx; p.y += p.vy;
+    p.life -= p.decay;
+    ctx.save();
+    ctx.globalAlpha = p.life * 0.88;
+    ctx.fillStyle = p.hue;
+    ctx.shadowBlur = 12; ctx.shadowColor = p.hue;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, Math.max(0.5, p.size*p.life), 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+  animFrame = requestAnimationFrame(animateParticles);
+}
+
+// ═══════════════════════════════════════════════════════
+//  SLIDER EVENTS
+// ═══════════════════════════════════════════════════════
+['ofSlider','pcSlider','nzSlider','dtSlider'].forEach(id => {
+  document.getElementById(id).addEventListener('input', () => {
+    update();
+    if(firing) {
+      updateRumbleParams();
+      applyFlameColors();
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════
+renderFuelGrid();
+renderOxGrid();
+initCharts();
+update();
+</script>
+</body>
+</html>
